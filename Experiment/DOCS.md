@@ -254,10 +254,16 @@ Applies a pixelation effect.
 ## Usage Example
 
 ```python
-import cv2
 from image_processing import read_image, display_image, dog
 
 image = read_image("example.jpg")
 filtered_image = dog(image)
 
 display_image(filtered_image)
+```
+
+---
+
+## License
+
+This module is open-source and freely available for modification and use.
