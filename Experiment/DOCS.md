@@ -46,7 +46,7 @@ Defines adaptive thresholding modes:
 
 ## Utility Functions
 
-### `extract_images_from_zip(zip_path, paths_file, output_folder)`
+### extract_images_from_zip
 Extracts images from a zip archive based on a provided list of file paths.
 
 **Parameters:**
@@ -58,7 +58,7 @@ Extracts images from a zip archive based on a provided list of file paths.
 
 ## Image I/O Functions
 
-### `read_image(path, flag=IOFlags.UNCHANGED) -> np.ndarray`
+### read_image
 Reads an image from a given path.
 
 **Parameters:**
@@ -72,7 +72,7 @@ Reads an image from a given path.
 - `ValueError`: If path is `None`.
 - `IOError`: If image cannot be read.
 
-### `display_image(image, label="image", width=None, height=None) -> None`
+### display_image
 Displays an image in an OpenCV window.
 
 **Parameters:**
@@ -88,7 +88,7 @@ Displays an image in an OpenCV window.
 
 ## Image Processing Functions
 
-### `is_grayscale(image) -> bool`
+### is_grayscale
 Checks if an image is in grayscale format.
 
 **Parameters:**
@@ -97,7 +97,7 @@ Checks if an image is in grayscale format.
 **Returns:**
 - `bool`: `True` if grayscale, `False` otherwise.
 
-### `ensure_grayscale(image) -> np.ndarray`
+### ensure_grayscale
 Converts an image to grayscale if necessary.
 
 **Parameters:**
@@ -110,7 +110,7 @@ Converts an image to grayscale if necessary.
 
 ## Edge Detection Filters
 
-### `dog(image, k=1.6, sigma=0.5, gamma=1, ksize=(0,0)) -> np.ndarray`
+### dog
 Applies the Difference of Gaussians (DoG) filter.
 
 **Parameters:**
@@ -126,7 +126,7 @@ Applies the Difference of Gaussians (DoG) filter.
 **Raises:**
 - `ValueError`: If image is `None`.
 
-### `xdog(image, sigma=0.5, k=200, gamma=0.98, epsilon=0.1, phi=10, intensity=1.0) -> np.ndarray`
+### xdog
 Applies the Extended Difference of Gaussians (XDoG) filter.
 
 **Parameters:**
@@ -148,7 +148,7 @@ Applies the Extended Difference of Gaussians (XDoG) filter.
 
 ## Thresholding Functions
 
-### `simple_thresholding(image, threshold_value, max_value=255, type=ThresholdType.BINARY) -> np.ndarray`
+### simple_thresholding
 Applies simple thresholding.
 
 **Parameters:**
@@ -163,7 +163,7 @@ Applies simple thresholding.
 **Raises:**
 - `ValueError`: If image is `None`.
 
-### `otsu_thresholding(image, max_value=255, type=ThresholdType.BINARY) -> np.ndarray`
+### otsu_thresholding
 Applies Otsu's thresholding.
 
 **Parameters:**
@@ -177,7 +177,7 @@ Applies Otsu's thresholding.
 **Raises:**
 - `ValueError`: If image is `None`.
 
-### `adaptative_thresholding(image, mode, size, c, max_value=255, inverse=False) -> np.ndarray`
+### adaptative_thresholding
 Applies adaptive thresholding.
 
 **Parameters:**
@@ -194,7 +194,7 @@ Applies adaptive thresholding.
 **Raises:**
 - `ValueError`: If image is `None`.
 
-### `mooney_filter(image, sigma, max_threshold=255, threshold_type=ThresholdType.BINARY) -> np.ndarray`
+### mooney_filter
 Applies Gaussian blur followed by Otsu’s thresholding.
 
 **Parameters:**
@@ -213,13 +213,13 @@ Applies Gaussian blur followed by Otsu’s thresholding.
 
 ## Frequency Filters
 
-### `bandpass_filter(image, low_cutoff=30, high_cutoff=100) -> np.ndarray`
+### bandpass_filter(image, low_cutoff=30, high_cutoff=100)
 Applies a band-pass filter using Fourier Transform.
 
-### `lowpass_filter(image, cutoff=30) -> np.ndarray`
+### lowpass_filter(image, cutoff=30) -> np.ndarray
 Applies a low-pass filter using Fourier Transform.
 
-### `highpass_filter(image, cutoff=30) -> np.ndarray`
+### highpass_filter(image, cutoff=30) -> np.ndarray
 Applies a high-pass filter using Fourier Transform.
 
 **Parameters (for all three filters):**
@@ -236,7 +236,7 @@ Applies a high-pass filter using Fourier Transform.
 
 ## Miscellaneous Functions
 
-### `pixelate_image(image, pixel_size=10) -> np.ndarray`
+### pixelate_image
 Applies a pixelation effect.
 
 **Parameters:**
