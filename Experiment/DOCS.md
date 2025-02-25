@@ -6,13 +6,10 @@ This module provides a set of image processing functions, including image readin
 ---
 
 ## Dependencies
-This module requires the following libraries:
+This module was written using Python version 3.10.12.\
+It requires the following libraries:
 - `opencv-python` (`cv2`)
 - `numpy`
-- `zipfile`
-- `logging`
-- `os`
-- `enum`
 
 ---
 
