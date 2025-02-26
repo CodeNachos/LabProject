@@ -10,11 +10,12 @@ from enum import IntFlag
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+logger.propagate = False
 
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 
-formatter = logging.Formatter("[%(levelname)s] %(funcName)s: %(message)s")
+formatter = logging.Formatter("[%(levelname)s] %(module)s - %(funcName)s: %(message)s")
 console_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
@@ -22,9 +23,8 @@ logger.addHandler(console_handler)
 # CONSTANTS ====================================================================
 
 class IOFlags(IntFlag):
-    UNCHANGED = cv2.IMREAD_UNCHANGED,
     GRAYSCALE = cv2.IMREAD_GRAYSCALE
-    COLOR = cv2.IMREAD_COLOR
+    COLOR = cv2.IMREAD_COLOR # BGR format
 
 class ThresholdType(IntFlag):
     BINARY = cv2.THRESH_BINARY
@@ -59,14 +59,14 @@ def extract_images_from_zip(zip_path, paths_file, output_folder):
     print("Extraction complete.")
 
 
-def read_image(path, flag:IOFlags=IOFlags.UNCHANGED) -> np.ndarray:
+def read_image(path, flag:IOFlags=IOFlags.COLOR) -> np.ndarray:
     """
     Reads an image from a given file path.
 
     Args:
         path (str): The file path to the image.
         flag (IOFlags, optional): The flag specifying how the image should be 
-            read. Defaults to IOFlags.UNCHANGED.
+            read. Defaults to IOFlags.COLOR.
 
     Returns:
         np.ndarray: The loaded image as a NumPy array.
@@ -83,6 +83,30 @@ def read_image(path, flag:IOFlags=IOFlags.UNCHANGED) -> np.ndarray:
         raise IOError("Image not found or path is incorrect.")
     
     return image
+
+
+def save_image(path: str, image: np.ndarray, params: list = None) -> None:
+    """
+    Saves an image to a given file path.
+
+    Args:
+        path (str): The file path where the image should be saved.
+        image (np.ndarray): The image to be saved as a NumPy array.
+        params (list, optional): Additional cv2 encoding parameters. 
+            Defaults to None.
+
+    Raises:
+        ValueError: If the path or image is None.
+        IOError: If the image cannot be saved.
+    """
+    if path is None:
+        raise ValueError("None reference to image path.")
+    
+    if image is None:
+        raise ValueError("None reference to image data.")
+    
+    if not cv2.imwrite(path, image, params or []):
+        raise IOError("Failed to save image.")
 
 
 def display_image(image:np.array, label:str="image", 
