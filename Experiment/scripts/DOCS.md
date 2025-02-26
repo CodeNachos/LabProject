@@ -13,6 +13,16 @@ It requires the following libraries:
 
 ---
 
+## Recomendations
+
+For better memory performance and optimality it is strongly recomended to only 
+keep reference of images being used. As we provide a function `read_image()` it
+is easy to create a large array of preloaded images but we strongly discourage 
+this practice, if not necessary, as your program can very fast take a lot of 
+memory space.
+
+---
+
 ## Configuration
 ### Logger Setup
 A logger is configured to output messages for debugging and information logging.
