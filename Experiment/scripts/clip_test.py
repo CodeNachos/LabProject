@@ -5,12 +5,11 @@ import numpy as np
 from torchvision import transforms
 from image_processing import is_grayscale
 
-# Load OpenCLIP model and transforms
-import open_clip
 
-# Load OpenCLIP model with QuickGELU
-model, preprocess, tokenizer = open_clip.create_model_and_transforms("ViT-H/14", pretrained="laion2b_s32b_b79k")
-
+# Load OpenCLIP model
+#model, preprocess, tokenizer = open_clip.create_model_and_transforms("ViT-H/14", pretrained="laion2b_s32b_b79k")
+model, _, preprocess = open_clip.create_model_and_transforms("ViT-B/16", pretrained="openai")
+tokenizer = open_clip.get_tokenizer('ViT-B-16')
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
