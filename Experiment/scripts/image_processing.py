@@ -5,6 +5,7 @@ import zipfile
 import logging
 import numpy as np
 from enum import IntFlag
+from skimage.metrics import structural_similarity as ssim
 
 # CONFIG =======================================================================
 
@@ -59,7 +60,7 @@ def extract_images_from_zip(zip_path, paths_file, output_folder):
     print("Extraction complete.")
 
 
-def read_image(path, flag:IOFlags=IOFlags.COLOR) -> np.ndarray:
+def read_image(path, flag:IOFlags=IOFlags.COLOR, dim:tuple=None) -> np.ndarray:
     """
     Reads an image from a given file path.
 
@@ -82,6 +83,9 @@ def read_image(path, flag:IOFlags=IOFlags.COLOR) -> np.ndarray:
     if image is None:
         raise IOError("Image not found or path is incorrect.")
     
+    if not dim is None:
+        image = resize(image, dim)
+
     return image
 
 
@@ -182,6 +186,13 @@ def ensure_grayscale(image):
     if len(image.shape) == 3:  # check for 3 channels (BGR)
         return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return image  # already grayscale
+
+
+def resize(image, dim):
+    return cv2.resize(image,dim)
+
+def resize_to_match(ref_image, image):
+    return cv2.resize(image, ref_image.shape[:2])
 
 # IMAGE PROCESSING FUNCTIONS ===================================================
 
@@ -580,3 +591,6 @@ def highpass_filter(image:np.array, cutoff:int=30) -> np.array:
 
     # return normalized image
     return cv2.normalize(imfiltered, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+
+def get_ssim(image1, image2):
+    return ssim(image1, image2)
