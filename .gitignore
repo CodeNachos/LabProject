@@ -170,5 +170,5 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Stimuli dataset
-*.zip
+# Stimuli images
+Experiment/res/stimuli/

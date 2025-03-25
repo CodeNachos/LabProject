@@ -36,22 +36,18 @@ if __name__ == "__main__":
         
         hc_clip = compare_images(src_img, hc_img)
         hc_ssim = imp.get_ssim(src_img, hc_img)
-        hc_val = image_metric(hc_clip, hc_ssim)
+        #hc_val = image_metric(hc_clip, hc_ssim)
 
         mc_clip = compare_images(src_img, mc_img)
         mc_ssim = imp.get_ssim(src_img, mc_img) 
-        mc_val = image_metric(mc_clip, mc_ssim)
+        #mc_val = image_metric(mc_clip, mc_ssim)
 
         metrics.append({
             "image"     : img_name,
-            "high"      : hc_val,
-            "medium"    : mc_val,
-            "medium-low": 0,
-            "low"       : 0,
             "high_clip" : hc_clip,
             "high_ssim" : hc_ssim,
-            "mc_clip"   : mc_clip,
-            "mc_ssim"   : mc_ssim
+            "medium_clip"   : mc_clip,
+            "medium_ssim"   : mc_ssim
         })
     
     df = pd.DataFrame(metrics)

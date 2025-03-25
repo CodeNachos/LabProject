@@ -12,6 +12,7 @@ FOLDER_LIST="$SRC_DIR/../res/categories.txt"
 while IFS= read -r folder; do
     if [[ -n "$folder" ]]; then 
         echo "Extracting $folder..."
+        mkdir -p "$SRC_DIR/../res/stimuli/original/"
         unzip -q -n "$ZIP_FILE" "$folder/*.jpg" -d "$SRC_DIR/../res/stimuli/original/"
     fi
 done < "$FOLDER_LIST"
