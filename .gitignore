@@ -171,4 +171,5 @@ cython_debug/
 .pypirc
 
 # Stimuli images
+Experiment/res/datasets/
 Experiment/res/stimuli/
