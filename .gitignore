@@ -173,3 +173,5 @@ cython_debug/
 # Stimuli images
 Experiment/res/datasets/
 Experiment/res/stimuli/
+/Experiment/res/datasets/mit_stimuli_scenes.zip
+
