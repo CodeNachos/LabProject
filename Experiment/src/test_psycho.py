@@ -1,13 +1,13 @@
-from psychopy import visual, core, event
+from psychopy import visual, core, event, monitors
 import numpy as np
 
 # Window setup for stereo (left-eye, right-eye)
-win = visual.Window(size=(1024, 768), units="pix", fullscr=False, stereo=False)
+win = visual.Window(monitor="testMonitor",  units="pix", fullscr=False)
 
 # Parameters
 flash_rate = 3  # Hz
 flash_interval = 1.0 / flash_rate  # seconds
-duration = 5  # seconds for the whole CFS trial
+duration = 1  # seconds for the whole CFS trial
 num_masks = int(duration * flash_rate)
 
 
@@ -28,8 +28,8 @@ def generate_mondrian(win, max_opacity):
 
 
 # Target stimulus (static image or shape)
-target = visual.ImageStim(win, image='../res/stimuli/grayscale/64-scenes/train-68/3-1.jpg', pos=(0,0))
-color_filter = np.array([-.75, -.1, -.1])
+target = visual.ImageStim(win, image='../res/stimuli/trialready/high/68-scenes/bridge-68/b_791021.jpg', pos=(0,0))
+color_filter = np.array([-.75, .1, -.1])
 target.setColor(color_filter)
 # Experiment loop
 clock = core.Clock()
@@ -51,6 +51,13 @@ while clock.getTime() - start_time < duration:
 
     # Update the display
     win.flip()
+
+    # Check for key press during the loop
+    keys = event.getKeys(timeStamped=clock)  # Capture key presses with timestamps
+    if keys:
+        response_time = keys[0][1]  # Capture the time at which the key was pressed
+        print(f"Response Time: {response_time:.4f} seconds")
+        break
 
     # Control timing: Wait for the remaining time in the loop
     elapsed_time = clock.getTime() - current_time  # Time since last frame update
