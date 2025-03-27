@@ -8,18 +8,18 @@ import utils.image_processing as imp
 
 # CONSTANTS ====================================================================
 
-DFDIM = (224, 224)
+IMDIM = (224, 224)
 
-DATASET_URL = 'http://olivalab.mit.edu/MM/downloads/Scenes.zip'
+_DATASET_URL = 'http://olivalab.mit.edu/MM/downloads/Scenes.zip'
 
-SRC_DIR = Path(__file__).resolve().parent
-CATEGORIES_PATH = (SRC_DIR / "../res/categories.txt").resolve()
-DATASET_PATH = (SRC_DIR / "../res/datasets/mit_stimuli_scenes.zip").resolve()
-STIMULI_PATH = (SRC_DIR / "../res/stimuli").resolve()
-ORIGIN_PATH = STIMULI_PATH / "original"
-GRAYSCALE_PATH = STIMULI_PATH / "grayscale"
-HICONGR_PATH = STIMULI_PATH / "trialready/high"
-MIDCONGR_PATH = STIMULI_PATH / "trialready/medium"
+_SRC_DIR = Path(__file__).resolve().parent
+_CATEGORIES_PATH = (_SRC_DIR / "../res/expdata/categories.txt").resolve()
+_DATASET_PATH = (_SRC_DIR / "../res/datasets/mit_stimuli_scenes.zip").resolve()
+_STIMULI_PATH = (_SRC_DIR / "../res/stimuli").resolve()
+_ORIGIN_PATH = _STIMULI_PATH / "original"
+_GRAYSCALE_PATH = _STIMULI_PATH / "grayscale"
+_HICONGR_PATH = _STIMULI_PATH / "trialready/high"
+_MIDCONGR_PATH = _STIMULI_PATH / "trialready/medium"
 
 # CONFIG =======================================================================
 
@@ -75,11 +75,11 @@ def verify_dataset():
         URLError: If a URL error occurs during the download.
         Exception: For any other errors encountered during the download.
     """
-    if not os.path.isfile(DATASET_PATH):
+    if not os.path.isfile(_DATASET_PATH):
         try:
-            logger.info(f"[INFO] Dataset file not found! Downloading from {DATASET_URL}...\n")
-            os.makedirs(DATASET_PATH.parent, exist_ok=True)
-            urlretrieve(DATASET_URL, DATASET_PATH, reporthook=_download_progress)
+            logger.info(f"[INFO] Dataset file not found! Downloading from {_DATASET_URL}...\n")
+            os.makedirs(_DATASET_PATH.parent, exist_ok=True)
+            urlretrieve(_DATASET_URL, _DATASET_PATH, reporthook=_download_progress)
             logger.info("\nDataset successfully downloaded!")
         except HTTPError as e:
             logger.error(f"HTTP error occurred: {e.code} - {e.reason}")
@@ -104,17 +104,17 @@ def extract_images(num_images=0, category_list_file=None):
     Raises:
         FileNotFoundError: If the specified category file does not exist.
     """
-    os.makedirs(ORIGIN_PATH, exist_ok=True)
+    os.makedirs(_ORIGIN_PATH, exist_ok=True)
 
     if category_list_file is None:
-        category_list_file = CATEGORIES_PATH
+        category_list_file = _CATEGORIES_PATH
 
     with open(category_list_file, 'r') as file:
         categories = [line.strip() for line in file if line.strip()]
 
     logger.info("Extracting images...\n")
 
-    with zipfile.ZipFile(DATASET_PATH, 'r') as zip_ref:
+    with zipfile.ZipFile(_DATASET_PATH, 'r') as zip_ref:
         for folder in categories:
             logger.info(f"-   Extracting {folder}...")
             matching_files = [
@@ -127,7 +127,7 @@ def extract_images(num_images=0, category_list_file=None):
                     matching_files = matching_files[:num_images]
 
                 for file in matching_files:
-                    zip_ref.extract(file, ORIGIN_PATH)
+                    zip_ref.extract(file, _ORIGIN_PATH)
             else:
                 logger.error(f"No files matched in {folder}")
         logger.info("\nExtraction complete!")
@@ -152,7 +152,7 @@ def medium_congruence(img, img_path):
             image does not exist.
     """
     mc_img = imp.lowpass_filter(img, 50)
-    dest = Path(f"{HICONGR_PATH}{img_path.as_posix()[len(ORIGIN_PATH.as_posix()):]}")
+    dest = Path(f"{_HICONGR_PATH}{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     imp.save_image(dest, mc_img)
 
@@ -175,7 +175,7 @@ def high_congruence(img, img_path):
     """
     hc_img = imp.xdog(img, sigma=0.5, k=100, gamma=.7, epsilon=0.3, phi=1)
     hc_img = imp.otsu_thresholding(hc_img)
-    dest = Path(f"{MIDCONGR_PATH}{img_path.as_posix()[len(ORIGIN_PATH.as_posix()):]}")
+    dest = Path(f"{_MIDCONGR_PATH}{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
     dest.parent.mkdir(parents=True, exist_ok=True)
     imp.save_image(dest, hc_img)
 
@@ -193,13 +193,13 @@ def process_stimuli():
         FileNotFoundError: If the destination directory for saving the processed 
             images does not exist.
     """
-    for img_path in ORIGIN_PATH.rglob("*.jpg"):
-        logger.info(f"Treating \"{img_path.as_posix()[len(ORIGIN_PATH.as_posix()):]}\"")
-        img = imp.read_image(img_path, flag=imp.IOFlags.GRAYSCALE, dim=DFDIM)
+    for img_path in _ORIGIN_PATH.rglob("*.jpg"):
+        logger.info(f"Treating \"{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}\"")
+        img = imp.read_image(img_path, flag=imp.IOFlags.GRAYSCALE, dim=IMDIM)
 
         logger.debug("-   Ensuring grayscale...")
         img = imp.ensure_grayscale(img)
-        dest = Path(f"{GRAYSCALE_PATH}{img_path.as_posix()[len(ORIGIN_PATH.as_posix()):]}")
+        dest = Path(f"{_GRAYSCALE_PATH}{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
         dest.parent.mkdir(parents=True, exist_ok=True)
         imp.save_image(dest, img)
 
@@ -214,9 +214,16 @@ def process_stimuli():
 
 # MAIN EXECUTION ===============================================================
 
+def create_stimuli(nb_images:int=0, category_list:str=None):
+    verify_dataset()
+    logger.info("")
+    extract_images(nb_images, category_list)
+    logger.info("")
+    process_stimuli()
+
 if __name__ == "__main__":
     verify_dataset()
-    logger.info()
+    logger.info("")
     extract_images(4, "test.txt")
-    logger.info()
+    logger.info("")
     process_stimuli()

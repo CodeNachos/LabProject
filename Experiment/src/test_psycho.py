@@ -7,7 +7,7 @@ win = visual.Window(monitor="testMonitor",  units="pix", fullscr=False)
 # Parameters
 flash_rate = 3  # Hz
 flash_interval = 1.0 / flash_rate  # seconds
-duration = 1  # seconds for the whole CFS trial
+duration = 6  # seconds for the whole CFS trial
 num_masks = int(duration * flash_rate)
 
 
@@ -28,7 +28,7 @@ def generate_mondrian(win, max_opacity):
 
 
 # Target stimulus (static image or shape)
-target = visual.ImageStim(win, image='../res/stimuli/trialready/high/68-scenes/bridge-68/b_791021.jpg', pos=(0,0))
+target = visual.ImageStim(win, image='../res/stimuli/trialready/high/68-scenes/bridge-68/b_791052.jpg', pos=(0,0))
 color_filter = np.array([-.75, .1, -.1])
 target.setColor(color_filter)
 # Experiment loop
