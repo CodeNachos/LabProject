@@ -1,7 +1,8 @@
 import os
 import json
-import logging
 import shutil
+import logging
+import argparse
 import numpy as np
 from typing import Dict
 from pathlib import Path
@@ -24,7 +25,7 @@ class _CacheKeys(StrEnum):
     CATEGORIES = 'category_list'
     RANDSEED = 'random_seed'
 
-WIN = visual.Window(monitor="testMonitor",  units="pix", fullscr=True)
+WIN = visual.Window(monitor="testMonitor",  units="pix", fullscr=True, allowStencil=True)
 
 _TRIAL_INSTRUCTION = "" \
 "Please press the space bar as soon as you see an image appear trough the mask."
@@ -61,6 +62,46 @@ console_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
 
+# main program parser
+parser = argparse.ArgumentParser(
+    prog="Experiment",
+    description="Runs the experimental pipeline, including data collection, processing, and result generation."
+)
+parser.add_argument(
+    '--version', 
+    action='version', 
+    version='%(prog)s 0.0.1'
+)
+parser.add_argument(
+    '-r', '--reset', 
+    action='store_false', 
+    help="Reset settings and cache to default values"
+)
+parser.add_argument(
+    '-s', '--set-subjetcts',
+    type=int,
+    help="Set number of total past subjects"
+)
+parser.add_argument(
+    '-i', '--images-per-category',
+    type=int,
+    help="Set number of images show per category"
+)
+parser.add_argument(
+    '-c', '--categories',
+    type=str,
+    help="Path to a category list text file"
+)
+parser.add_argument(
+    '--seed',
+    type=int,
+    help="Set random seed"
+)
+parser.add_argument(
+    '-v', '--verbose',
+    action="store_true",
+    help="Increase output verbosity"
+)
 
 # experiment config
 _subjectid = _DEFAULTS[_CacheKeys.SUBJECTS]
@@ -169,12 +210,14 @@ def get_images() -> Dict[str, Path]:
     for img_path in _TARGET_PATH.rglob("*.jpg"):
         images[img_path.parent.name].append(
             (
-                img_path.name, 
+                img_path, 
                 subject_modalities[len(images[img_path.parent.name])%NB_MODALITIES]
             )
         )
     
     return images
+
+# VISUAL =======================================================================
 
 def get_fixation_cross(win=None) -> visual.ShapeStim:
     if win is None: win=WIN
@@ -268,18 +311,69 @@ def show_instructions(win=None):
 # MAIN EXECUTION ===============================================================
 
 if __name__ == "__main__":
+    args = parser.parse_args()
+    print(vars(args))
+    
     _load_cache()
     _categories:Path = (_RELATIVE_PATH / "../test.txt").resolve()
     _verify_files()
+
     images = get_images()
     show_instructions()
+    
     background = get_mondrian_pattern(200)
-    while True:
+    stimulus_frame = visual.Circle(WIN, size=WIN.size[0]*.5, color="gray")
+    color_filter = np.array([-.75, -.1, -.1])
+
+
+    clock = core.Clock()
+    opacity = 1
+    start_time = clock.getTime()
+
+    flash_rate = 3  # Hz
+    flash_interval = 1.0 / flash_rate  # seconds
+    duration = 6  # seconds for the whole CFS trial
+
+    while clock.getTime() - start_time < duration:
+        # Get the current time
+        current_time = clock.getTime()
+
+        # Update opacity (smoothly decreases over time)
+        opacity = (current_time / duration)
+
         background.draw()
+        stimulus_frame.draw()
+
+        aperture = visual.Aperture(WIN, size=WIN.size[0]*.4, shape='circle')  # 300 pixels wide circle
+        aperture.enabled = True
+        image = visual.ImageStim(
+            win=WIN,
+            image=images['bridge-68'][_subjectid%_nb_catimgs][0],
+            size=WIN.size[0]*.4
+        )
+        
+        image.setColor(color_filter)
+        #image.opacity = opacity
+        image.draw()
+        mask = get_mondrian_pattern(200, (.7,.7), color=[-.1, -.7, -.7], max_opacity=1-opacity)
+        #mask.draw()
+        aperture.enabled = False
+
         get_fixation_cross().draw()
         WIN.flip()
-        event.waitKeys(keyList=['space'])
-        _update_cache(_CacheKeys.SUBJECTS, _subjectid+1)
-        break
+
+        # Check for vkey press during the loop
+        keys = event.getKeys(timeStamped=clock)  # Capture key presses with timestamps
+        if keys:
+            response_time = keys[0][1]  # Capture the time at which the key was pressed
+            print(f"Response Time: {response_time:.4f} seconds")
+            break
+        
+        elapsed_time = clock.getTime() - current_time  # Time since last frame update
+        core.wait(flash_interval - elapsed_time)
+
+    
+    _update_cache(_CacheKeys.SUBJECTS, _subjectid+1)
+    
     WIN.close()      
     core.quit()
