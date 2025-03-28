@@ -1,6 +1,16 @@
 {
-  "total_subjects": 2,
-  "images_per_category": "4",
-  "category_list": "C:\\Users\\rafae\\OneDrive\\Documents\\univ\\M1\\Semestre8\\LabProject\\Experiment\\res\\categories.txt",
-  "random_seed": "42"
+  "total_subjects": 1,
+  "images_per_category": 4,
+  "category_list": "test.txt",
+  "random_seed": 42,
+  "red_filter": [
+    -0.75,
+    -0.1,
+    -0.1
+  ],
+  "cyan_filter": [
+    -0.1,
+    -0.7,
+    -0.7
+  ]
 }

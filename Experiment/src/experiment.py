@@ -3,6 +3,7 @@ import json
 import shutil
 import logging
 import argparse
+import stimgrab
 import numpy as np
 from typing import Dict
 from pathlib import Path
@@ -23,7 +24,10 @@ class _CacheKeys(StrEnum):
     SUBJECTS = 'total_subjects'
     CATIMGS = 'images_per_category',
     CATEGORIES = 'category_list'
-    RANDSEED = 'random_seed'
+    REDFILTER = 'red_filter'
+    CYANFILTER = 'cyan_filter',
+    USERANDSEED = 'use_random_seed'
+    RANDSEED = 'random_seed',
 
 WIN = visual.Window(monitor="testMonitor",  units="pix", fullscr=True, allowStencil=True)
 
@@ -40,10 +44,13 @@ _CACHE_FILE = _RELATIVE_PATH / "../res/expdata/.expcache.json"
 
 # default config
 _DEFAULTS = {
-    _CacheKeys.SUBJECTS: 0,
-    _CacheKeys.CATIMGS: 4,
-    _CacheKeys.CATEGORIES: (_RELATIVE_PATH / "../res/expdata/categories.txt").resolve(),
-    _CacheKeys.RANDSEED: 42
+    _CacheKeys.SUBJECTS     : 0,
+    _CacheKeys.CATIMGS      : 4,
+    _CacheKeys.CATEGORIES   : (_RELATIVE_PATH / "../res/expdata/categories.txt").resolve(),
+    _CacheKeys.REDFILTER    : [-.75, -.1, -.1],
+    _CacheKeys.CYANFILTER   : [-.1, -.7, -.7],
+    _CacheKeys.USERANDSEED  : True,
+    _CacheKeys.RANDSEED     : 42
 }
 
 # CONFIG =======================================================================
@@ -74,11 +81,11 @@ parser.add_argument(
 )
 parser.add_argument(
     '-r', '--reset', 
-    action='store_false', 
+    action='store_true', 
     help="Reset settings and cache to default values"
 )
 parser.add_argument(
-    '-s', '--set-subjetcts',
+    '-s', '--set-subjects',
     type=int,
     help="Set number of total past subjects"
 )
@@ -93,13 +100,28 @@ parser.add_argument(
     help="Path to a category list text file"
 )
 parser.add_argument(
+    '--cyan_filter',
+    type=list,
+    help="Set cyan filter color"
+)
+parser.add_argument(
+    '--red-filter',
+    type=list,
+    help="Set red filter color"
+)
+parser.add_argument(
     '--seed',
     type=int,
     help="Set random seed"
 )
 parser.add_argument(
+    '--use-seed',
+    action='set-false',
+    help="If given it won't use a constant random seed"
+)
+parser.add_argument(
     '-v', '--verbose',
-    action="store_true",
+    action="store_false",
     help="Increase output verbosity"
 )
 
@@ -107,11 +129,51 @@ parser.add_argument(
 _subjectid = _DEFAULTS[_CacheKeys.SUBJECTS]
 _nb_catimgs:int = _DEFAULTS[_CacheKeys.CATIMGS]
 _categories:Path = _DEFAULTS[_CacheKeys.CATEGORIES]
+_red_filter = _DEFAULTS[_CacheKeys.REDFILTER]
+_cyan_filter = _DEFAULTS[_CacheKeys.CYANFILTER]
 _random_seed = _DEFAULTS[_CacheKeys.RANDSEED]
+_use_random_seed = _DEFAULTS[_CacheKeys.USERANDSEED]
 
 # UTILITY ======================================================================
 
+# manage command line argumentss
+
+def _handle_args():
+    args = parser.parse_args()
+    
+    for key, value in vars(args).items():
+        if value is not None:
+            if key == "reset":
+                if value: _load_defaults()
+            elif key == "set_subjects":
+                _update_cache(_CacheKeys.SUBJECTS, value)
+            elif key == "images-per-category":
+                _update_cache(_CacheKeys.CATIMGS, value)
+            elif key == "categories":
+                _update_cache(_CacheKeys.CATEGORIES, value)
+            elif key == "red-filter":
+                _update_cache(_CacheKeys.REDFILTER, value)
+            elif key == "cyan-filter":
+                _update_cache(_CacheKeys.CYANFILTER, value)
+            elif key == "seed":
+                _update_cache(_CacheKeys.RANDSEED, value)
+            elif key == 'use-seed':
+                _update_cache(_CacheKeys.USERANDSEED, value)
+            elif key == "verbose":
+                if value: 
+                    logger.setLevel(logging.INFO)
+                    logging.getLogger("stimgrab").setLevel(logging.INFO)
+                else: 
+                    logger.setLevel(logging.ERROR)
+                    logging.getLogger("stimgrab").setLevel(logging.ERROR)
+                    print  (logging.getLogger("stimgrab"))
+            
 # cache management
+
+def _json_serialize(value):
+    if isinstance(value, Path):
+        return str(value)
+    return value
 
 def _update_cache(key: str, value) -> None:
     data = {}
@@ -123,7 +185,7 @@ def _update_cache(key: str, value) -> None:
         except json.JSONDecodeError:
             logger.warning("[WARNING]: cache file is corrupted, starting fresh.")
 
-    data[key] = value
+    data[key] = _json_serialize(value)
 
     _CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
     with _CACHE_FILE.open("w", encoding="utf-8") as f:
@@ -146,7 +208,7 @@ def _load_defaults():
         os.remove(_CACHE_FILE)
     
     for key, value in _DEFAULTS.items():
-        _update_cache(key.value, str(value))
+        _update_cache(key.value, value)
     
 def _load_cache():
     if not _CACHE_FILE.exists():
@@ -154,16 +216,19 @@ def _load_cache():
         _load_defaults()
         return
 
-    global _subjectid; global _nb_catimgs
-    global _categories; global _random_seed
+    global _subjectid; global _nb_catimgs; global _categories;
+    global _random_seed; global _use_random_seed;
+    global _red_filter; global _cyan_filter;
 
     cache = _read_cache()
 
     _subjectid = int(cache[_CacheKeys.SUBJECTS])
     _nb_catimgs = int(cache[_CacheKeys.CATIMGS])
     _categories = Path(cache[_CacheKeys.CATEGORIES])
+    _red_filter = cache[_CacheKeys.REDFILTER]
+    _cyan_filter = cache[_CacheKeys.CYANFILTER]
     _random_seed = int(cache[_CacheKeys.RANDSEED])
-
+    _use_random_seed = bool(cache[_CacheKeys.USERANDSEED])
 
 def _verify_files() -> None:
     missing_files = False
@@ -194,7 +259,6 @@ def _verify_files() -> None:
 
     if _STIMULI_PATH.exists(): shutil.rmtree(_STIMULI_PATH)
 
-    import stimgrab
     stimgrab.create_stimuli(_nb_catimgs, _categories)
 
     logger.info("[INFO]: Stimuli data successfully generated!")
@@ -310,12 +374,27 @@ def show_instructions(win=None):
 
 # MAIN EXECUTION ===============================================================
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-    print(vars(args))
-    
+def run_cycle():
+    pass
+
+def run_trial():
+    background = get_mondrian_pattern(200)
+
+    stimuli = get_images()
+
+
+
+def main():
+    _handle_args()
     _load_cache()
-    _categories:Path = (_RELATIVE_PATH / "../test.txt").resolve()
+    _verify_files()
+
+    np.random.seed(_random_seed)
+
+
+if __name__ == "__main__":
+    _handle_args()
+    _load_cache()
     _verify_files()
 
     images = get_images()
@@ -323,7 +402,7 @@ if __name__ == "__main__":
     
     background = get_mondrian_pattern(200)
     stimulus_frame = visual.Circle(WIN, size=WIN.size[0]*.5, color="gray")
-    color_filter = np.array([-.75, -.1, -.1])
+    color_filter = np.array(_red_filter)
 
 
     clock = core.Clock()
@@ -344,7 +423,7 @@ if __name__ == "__main__":
         background.draw()
         stimulus_frame.draw()
 
-        aperture = visual.Aperture(WIN, size=WIN.size[0]*.4, shape='circle')  # 300 pixels wide circle
+        aperture = visual.Aperture(WIN, size=WIN.size[0]*.4, shape='circle')
         aperture.enabled = True
         image = visual.ImageStim(
             win=WIN,
@@ -353,10 +432,10 @@ if __name__ == "__main__":
         )
         
         image.setColor(color_filter)
-        #image.opacity = opacity
+        image.opacity = opacity
         image.draw()
-        mask = get_mondrian_pattern(200, (.7,.7), color=[-.1, -.7, -.7], max_opacity=1-opacity)
-        #mask.draw()
+        mask = get_mondrian_pattern(200, (.7,.7), color=_cyan_filter, max_opacity=1-opacity)
+        mask.draw()
         aperture.enabled = False
 
         get_fixation_cross().draw()
@@ -375,5 +454,5 @@ if __name__ == "__main__":
     
     _update_cache(_CacheKeys.SUBJECTS, _subjectid+1)
     
-    WIN.close()      
+    WIN.close()
     core.quit()
