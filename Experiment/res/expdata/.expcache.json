@@ -1,8 +1,7 @@
 {
-  "total_subjects": 1,
+  "total_subjects": 0,
   "images_per_category": 4,
   "category_list": "test.txt",
-  "random_seed": 42,
   "red_filter": [
     -0.75,
     -0.1,
@@ -12,5 +11,7 @@
     -0.1,
     -0.7,
     -0.7
-  ]
+  ],
+  "use_random_seed": false,
+  "random_seed": 42
 }
