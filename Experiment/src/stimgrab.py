@@ -212,23 +212,30 @@ def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modaliti
     if not _is_text_modality(modality):
         raise ValueError("Modality is not a text modality.")
 
-    MEDIUMLOW_PROMPT = "Objectively this is a picture showing" 
-    LOW_PROMPT = "Objectively this is a photo of"
+    MEDIUMLOW_PROMPT = ("Context: This is a scene description task."
+        "Question: In one or two sentences, describe the structure in this image"
+        "— its shapes, forms, and main architectural components. Answer:" 
+    )
+    LOW_PROMPT = ("Context: This is a scene description task."
+        "Label the category of the main object or structure in this image? Answer:"
+    )
 
-    model_name = "Salesforce/blip2-opt-2.7b"
+    model_name = "Salesforce/blip2-flan-t5-xl"
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cpu")
     
     # load processor and model
     if not hasattr(text_modality_transform, "PROCESSOR"):
         text_modality_transform.PROCESSOR = AutoProcessor.from_pretrained(
-            model_name
+            model_name,
+            use_fast=True
         )
     if not hasattr(text_modality_transform, "MODEL"):
         text_modality_transform.MODEL = Blip2ForConditionalGeneration.from_pretrained(
             model_name, 
             device_map = {"": "cpu"},
-            torch_dtype = torch.float32
+            torch_dtype = torch.float32,
+            low_cpu_mem_usage = True
         )
     
     # Prepare inputs
