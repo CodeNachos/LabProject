@@ -1,3 +1,2 @@
 68-scenes/bridge-68
 68-scenes/house-68
-68-scenes/bridge-68

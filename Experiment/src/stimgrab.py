@@ -1,12 +1,34 @@
 import os
-import zipfile
+import torch
 import logging
+import zipfile
+import numpy as np
+from enum import IntEnum
 from pathlib import Path
 from urllib.request import urlretrieve
 from urllib.error import URLError, HTTPError
+from transformers import AutoProcessor, Blip2ForConditionalGeneration, AutoTokenizer, BitsAndBytesConfig
+
 import utils.image_processing as imp
 
 # CONSTANTS ====================================================================
+
+
+class Modalities(IntEnum):
+    LOW = 1
+    MEDIUMLOW = 2
+    MEDIUM = 3
+    HIGH = 4
+
+    def __str__(self):
+        if self == self.LOW:
+            return "low"
+        elif self == self.MEDIUMLOW:
+            return "medium-low"
+        elif self == self.MEDIUM:
+            return "medium"
+        elif self == self.HIGH:
+            return "high"
 
 IMDIM = (224, 224)
 
@@ -18,8 +40,10 @@ _DATASET_PATH = (_SRC_DIR / "../res/datasets/mit_stimuli_scenes.zip").resolve()
 _STIMULI_PATH = (_SRC_DIR / "../res/stimuli").resolve()
 _ORIGIN_PATH = _STIMULI_PATH / "original"
 _GRAYSCALE_PATH = _STIMULI_PATH / "grayscale"
-_HICONGR_PATH = _STIMULI_PATH / "trialready/high"
-_MIDCONGR_PATH = _STIMULI_PATH / "trialready/medium"
+_HIMOD_PATH = _STIMULI_PATH / "trialready/high"
+_MIDMOD_PATH = _STIMULI_PATH / "trialready/medium"
+_MIDLOWMOD_PATH = _STIMULI_PATH / "trialready/mediumlow"
+_LOWMOD_PATH = _STIMULI_PATH / "trialready/low"
 
 # CONFIG =======================================================================
 
@@ -37,6 +61,9 @@ logger.addHandler(console_handler)
 
 
 # UTILITY ======================================================================
+
+_is_image_modality = lambda m : m in [Modalities.HIGH, Modalities.MEDIUM]
+_is_text_modality  = lambda m : m in [Modalities.MEDIUMLOW, Modalities.LOW]
 
 def _download_progress(blocknum, blocksize, totalsize):
     """
@@ -135,7 +162,10 @@ def extract_images(num_images=0, category_list_file=None):
 
 # IMG PROCESSING ===============================================================
 
-def medium_congruence(img, img_path):
+# Modality transforms
+# Image modalities 
+
+def medium_modality_transform(image:np.ndarray) -> np.ndarray:
     """
     Applies medium congruence processing to the image.
 
@@ -144,20 +174,10 @@ def medium_congruence(img, img_path):
 
     Args:
         img (numpy.ndarray): The image to process.
-        img_path (Path): The path to the original image for saving the processed 
-            version.
-
-    Raises:
-        FileNotFoundError: If the destination directory for saving the processed 
-            image does not exist.
     """
-    mc_img = imp.lowpass_filter(img, 50)
-    dest = Path(f"{_HICONGR_PATH}{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    imp.save_image(dest, mc_img)
+    return imp.lowpass_filter(image, 50)
 
-
-def high_congruence(img, img_path):
+def high_modality_transform(image:np.ndarray) -> np.ndarray:
     """
     Applies high congruence processing to the image.
 
@@ -166,32 +186,88 @@ def high_congruence(img, img_path):
 
     Args:
         img (numpy.ndarray): The image to process.
-        img_path (Path): The path to the original image for saving the processed 
-            version.
-
-    Raises:
-        FileNotFoundError: If the destination directory for saving the processed 
-            image does not exist.
     """
-    hc_img = imp.xdog(img, sigma=0.5, k=100, gamma=.7, epsilon=0.3, phi=1)
-    hc_img = imp.otsu_thresholding(hc_img)
-    dest = Path(f"{_MIDCONGR_PATH}{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    imp.save_image(dest, hc_img)
+    hc_img = imp.xdog(image, sigma=0.5, k=100, gamma=.7, epsilon=0.3, phi=1)
+    return imp.otsu_thresholding(hc_img)
 
+def image_modality_transform(image:np.ndarray, image_path:Path, modality:Modalities):
+    if not _is_image_modality(modality):
+        raise ValueError("Modality is not an image modality.")
+
+    output_image = None
+
+    if modality == Modalities.HIGH:
+        output_image = high_modality_transform(image)
+        dest = Path(f"{_HIMOD_PATH}{image_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
+    elif modality == Modalities.MEDIUM:
+        output_image = medium_modality_transform(image)
+        dest = Path(f"{_MIDMOD_PATH}{image_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}")
+    
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    imp.save_image(dest, output_image)
+
+# Text modalities
+
+def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modalities):
+    if not _is_text_modality(modality):
+        raise ValueError("Modality is not a text modality.")
+
+    MEDIUMLOW_PROMPT = "Objectively this is a picture showing" 
+    LOW_PROMPT = "Objectively this is a photo of"
+
+    model_name = "Salesforce/blip2-opt-2.7b"
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    # load processor and model
+    if not hasattr(text_modality_transform, "PROCESSOR"):
+        text_modality_transform.PROCESSOR = AutoProcessor.from_pretrained(
+            model_name
+        )
+    if not hasattr(text_modality_transform, "MODEL"):
+        text_modality_transform.MODEL = Blip2ForConditionalGeneration.from_pretrained(
+            model_name, 
+            device_map = {"": "cpu"},
+            torch_dtype = torch.float32
+        )
+    
+    # Prepare inputs
+    relative_path = image_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]
+    import cv2
+    blip_image = cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
+
+    if modality == Modalities.MEDIUMLOW:
+        inputs = text_modality_transform.PROCESSOR(
+            images=blip_image, text=MEDIUMLOW_PROMPT, 
+            return_tensors="pt"
+        ).to(device, dtype=torch.float16)
+        dest = Path(f"{_MIDLOWMOD_PATH}{relative_path}").with_suffix('.txt')
+    elif modality == Modalities.LOW:
+        inputs = text_modality_transform.PROCESSOR(
+            images=blip_image, text=LOW_PROMPT, 
+            return_tensors="pt"
+        ).to(device, dtype=torch.float16)
+        dest = Path(f"{_LOWMOD_PATH}{relative_path}").with_suffix('.txt')
+
+    # generate output
+    generated_ids = text_modality_transform.MODEL.generate(**inputs, max_new_tokens=30)
+    description = text_modality_transform.PROCESSOR.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+    print(">>",description)
+
+    # save the description
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write(description)
+
+# General image processing
 
 def process_stimuli():
     """
     Processes all images by ensuring grayscale and applying congruence 
     methods.
 
-    This function will convert each image to grayscale, apply the medium 
-    congruence method, and apply the high congruence method, saving each 
-    processed image to the appropriate directory.
-
-    Raises:
-        FileNotFoundError: If the destination directory for saving the processed 
-            images does not exist.
+    This function will convert each image to grayscale, apply modalities 
+    transform methods, saving each processed image to the appropriate directory.
     """
     for img_path in _ORIGIN_PATH.rglob("*.jpg"):
         logger.info(f"Treating \"{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}\"")
@@ -203,11 +279,11 @@ def process_stimuli():
         dest.parent.mkdir(parents=True, exist_ok=True)
         imp.save_image(dest, img)
 
-        logger.debug("-   Converting using medium congruence method...")
-        high_congruence(img, img_path)
-
-        logger.debug("-   Converting using high congruence method...")
-        medium_congruence(img, img_path)
+        for m in list(Modalities):
+            logger.debug(f"-   Converting using {m} congruence transform...")
+            if _is_text_modality(m): 
+                text_modality_transform(img, img_path, m)
+            elif _is_image_modality(m): image_modality_transform(img, img_path, m)
 
     logger.info("\nImage treatment complete!")
 
