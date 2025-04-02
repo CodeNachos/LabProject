@@ -7,7 +7,7 @@ from enum import IntEnum
 from pathlib import Path
 from urllib.request import urlretrieve
 from urllib.error import URLError, HTTPError
-from transformers import AutoProcessor, Blip2ForConditionalGeneration, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoProcessor, Blip2ForConditionalGeneration, AutoTokenizer, AutoModelForSeq2SeqLM
 
 import utils.image_processing as imp
 
@@ -46,13 +46,14 @@ _MIDLOWMOD_PATH = _STIMULI_PATH / "trialready/mediumlow"
 _LOWMOD_PATH = _STIMULI_PATH / "trialready/low"
 
 # CONFIG =======================================================================
+_default_logger_level = logging.INFO 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+logger.setLevel(_default_logger_level)
 logger.propagate = False
 
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
+console_handler.setLevel(_default_logger_level)
 
 formatter = logging.Formatter("%(message)s")
 console_handler.setFormatter(formatter)
@@ -165,9 +166,9 @@ def extract_images(num_images=0, category_list_file=None):
 # Modality transforms
 # Image modalities 
 
-def medium_modality_transform(image:np.ndarray) -> np.ndarray:
+def high_modality_transform(image:np.ndarray) -> np.ndarray:
     """
-    Applies medium congruence processing to the image.
+    Applies high congruence processing to the image.
 
     This method applies a low-pass filter to the image to modify its congruence 
     characteristics.
@@ -177,12 +178,12 @@ def medium_modality_transform(image:np.ndarray) -> np.ndarray:
     """
     return imp.lowpass_filter(image, 50)
 
-def high_modality_transform(image:np.ndarray) -> np.ndarray:
+def medium_modality_transform(image:np.ndarray) -> np.ndarray:
     """
-    Applies high congruence processing to the image.
+    Applies medium congruence processing to the image.
 
-    This method applies XDoG (Extended Difference of Gaussian) and Otsu t
-    hresholding to the image.
+    This method applies XDoG (Extended Difference of Gaussian) and Otsu 
+    thresholding to the image.
 
     Args:
         img (numpy.ndarray): The image to process.
@@ -207,6 +208,49 @@ def image_modality_transform(image:np.ndarray, image_path:Path, modality:Modalit
     imp.save_image(dest, output_image)
 
 # Text modalities
+
+def _translate_text_modalities():
+    # load the model and tokenizer once
+    model_name = "Helsinki-NLP/opus-mt-en-fr"
+
+    if not hasattr(_translate_text_modalities, "tokenizer"):
+        _translate_text_modalities.tokenizer = AutoTokenizer.from_pretrained(
+            model_name
+        )
+    if not hasattr(_translate_text_modalities, "model"):
+        _translate_text_modalities.model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_name
+        )
+
+    tokenizer = _translate_text_modalities.tokenizer
+    model = _translate_text_modalities.model
+
+    # find all .txt files that are not already translated
+    for txt_path in _STIMULI_PATH.rglob("*_en.txt"):
+        if txt_path.stem.endswith("_fr"):
+            continue  # skip already translated files just in case
+
+        with open(txt_path, "r", encoding="utf-8") as f:
+            text = f.read().strip()
+        if not text:
+            continue  # skip empty files
+
+        # translate
+        inputs = tokenizer(text, return_tensors="pt")
+        translated_ids = model.generate(**inputs, max_length=100)
+        translation = tokenizer.batch_decode(
+            translated_ids, 
+            skip_special_tokens=True
+        )[0].strip()
+
+        # save to a new file ending with _fr.txt
+        translated_path = txt_path.with_name(
+            txt_path.stem.replace("_en", "_fr") + ".txt"
+        )
+        with open(translated_path, "w", encoding="utf-8") as f:
+            f.write(translation)
+
+        logger.debug(f">> Translated: {txt_path.name} -> {translated_path.name}")
 
 def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modalities):
     if not _is_text_modality(modality):
@@ -248,18 +292,20 @@ def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modaliti
             images=blip_image, text=MEDIUMLOW_PROMPT, 
             return_tensors="pt"
         ).to(device, dtype=torch.float16)
-        dest = Path(f"{_MIDLOWMOD_PATH}{relative_path}").with_suffix('.txt')
+        dest = Path(f"{_MIDLOWMOD_PATH}{relative_path}")
+        dest = dest.with_name(dest.stem + "_en.txt")
     elif modality == Modalities.LOW:
         inputs = text_modality_transform.PROCESSOR(
             images=blip_image, text=LOW_PROMPT, 
             return_tensors="pt"
         ).to(device, dtype=torch.float16)
-        dest = Path(f"{_LOWMOD_PATH}{relative_path}").with_suffix('.txt')
+        dest = Path(f"{_LOWMOD_PATH}{relative_path}")
+        dest = dest.with_name(dest.stem + "_en.txt")
 
     # generate output
     generated_ids = text_modality_transform.MODEL.generate(**inputs, max_new_tokens=30)
     description = text_modality_transform.PROCESSOR.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-    print(">>",description)
+    logger.debug(">>",description)
 
     # save the description
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -291,6 +337,8 @@ def process_stimuli():
             if _is_text_modality(m): 
                 text_modality_transform(img, img_path, m)
             elif _is_image_modality(m): image_modality_transform(img, img_path, m)
+
+        _translate_text_modalities()
 
     logger.info("\nImage treatment complete!")
 
