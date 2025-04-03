@@ -48,7 +48,7 @@ class _CacheKeys(StrEnum):
     CYANFILTER = 'cyan_filter'
     USERANDSEED = 'use_random_seed'
     RANDSEED = 'random_seed'
-    LANGUAGE = Languages.EN
+    LANGUAGE = 'language'
 
 _TRIAL_INSTRUCTION = {
     Languages.EN:
