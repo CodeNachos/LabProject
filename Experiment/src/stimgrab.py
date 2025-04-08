@@ -320,8 +320,8 @@ def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modaliti
     # Prepare inputs
     relative_path = image_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]
     
-    import cv2
-    blip_image = cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
+    #import cv2
+    #blip_image = cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
 
     if modality == Modalities.MEDIUMLOW:
         #inputs = text_modality_transform.PROCESSOR(
