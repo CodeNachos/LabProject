@@ -170,9 +170,9 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# Stimuli images
+# Esperiment resources
 Experiment/res/datasets/
 Experiment/res/aimodels/
-Experiment/res/stimuli/
 /Experiment/res/datasets/mit_stimuli_scenes.zip
+#Experiment/res/stimuli/
 

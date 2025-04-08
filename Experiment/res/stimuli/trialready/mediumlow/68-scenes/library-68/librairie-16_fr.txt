@@ -1,0 +1,1 @@
+Librairie avec des tables d'affichage et des étagères pleines de livres.

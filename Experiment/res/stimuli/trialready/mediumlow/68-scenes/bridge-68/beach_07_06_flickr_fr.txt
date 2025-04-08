@@ -1,1 +1,1 @@
-Missing stimulus description
+Pont suspendu avec tour rectangulaire et câbles.

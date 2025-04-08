@@ -1,11 +1,6 @@
 68-scenes/bridge-68
 68-scenes/castle-68
-68-scenes/gym-68
 68-scenes/house-68
 68-scenes/library-68
 68-scenes/skyscraper-68
 68-scenes/temple-68
-68-scenes/woods-68
-
-64-scenes/concert_hall-68
-64-scenes/train-68

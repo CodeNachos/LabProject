@@ -122,13 +122,13 @@ def _init_opus():
     # load the model and tokenizer once
     model_name = "Helsinki-NLP/opus-mt-en-fr"
 
-    if not hasattr(_translate_text_modalities, "tokenizer"):
-        _translate_text_modalities.tokenizer = AutoTokenizer.from_pretrained(
+    if not hasattr(translate_text_modalities, "tokenizer"):
+        translate_text_modalities.tokenizer = AutoTokenizer.from_pretrained(
             model_name,
             cache_dir=_MODELS_PATH
         )
-    if not hasattr(_translate_text_modalities, "model"):
-        _translate_text_modalities.model = AutoModelForSeq2SeqLM.from_pretrained(
+    if not hasattr(translate_text_modalities, "model"):
+        translate_text_modalities.model = AutoModelForSeq2SeqLM.from_pretrained(
             model_name,
             cache_dir=_MODELS_PATH
         )
@@ -260,15 +260,15 @@ def image_modality_transform(image:np.ndarray, image_path:Path, modality:Modalit
 
 # Text modalities
 
-def _translate_text_modalities():
+def translate_text_modalities():
     # load the model and tokenizer once
-    #if not hasattr(_translate_text_modalities, "model"):
-    #    _init_opus
+    if not hasattr(translate_text_modalities, "model"):
+        _init_opus
     
-    #import torch
+    import torch
     
-    #tokenizer = _translate_text_modalities.tokenizer
-    #model = _translate_text_modalities.model
+    tokenizer = translate_text_modalities.tokenizer
+    model = translate_text_modalities.model
 
     # find all .txt files that are not already translated
     for txt_path in _STIMULI_PATH.rglob("*_en.txt"):
@@ -282,12 +282,12 @@ def _translate_text_modalities():
 
         translation = "Missing stimulus description"
         # translate
-        #inputs = tokenizer(text, return_tensors="pt")
-        #translated_ids = model.generate(**inputs, max_length=100)
-        #translation = tokenizer.batch_decode(
-        #    translated_ids, 
-        #    skip_special_tokens=True
-        #)[0].strip()
+        inputs = tokenizer(text, return_tensors="pt")
+        translated_ids = model.generate(**inputs, max_length=100)
+        translation = tokenizer.batch_decode(
+            translated_ids, 
+            skip_special_tokens=True
+        )[0].strip()
 
         # save to a new file ending with _fr.txt
         translated_path = txt_path.with_name(
@@ -381,7 +381,7 @@ def process_stimuli():
                 text_modality_transform(img, img_path, m)
             elif is_image_modality(m): image_modality_transform(img, img_path, m)
 
-        _translate_text_modalities()
+        translate_text_modalities()
 
     logger.info("\nImage treatment complete!")
 
@@ -396,4 +396,4 @@ def create_stimuli(nb_images:int=0, category_list:str=None):
     process_stimuli()
 
 if __name__ == "__main__":
-    create_stimuli(nb_images=5)
+    pass
