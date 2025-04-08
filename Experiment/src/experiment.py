@@ -630,7 +630,7 @@ def run_stimulus(
         target.opacity = opacity
         target.draw()
         
-        mask = get_mondrian_pattern(win, 100, (.7,.7), color=_cyan_filter, max_opacity=1-opacity)
+        mask = get_mondrian_pattern(win, 70, (.7,.7), color=_cyan_filter, max_opacity=1-opacity)
         mask.draw()
         
         aperture.enabled = False
