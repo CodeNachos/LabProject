@@ -4,7 +4,6 @@ import json
 import shutil
 import logging
 import argparse
-import stimgrab
 import numpy as np
 from time import time
 from typing import Dict
@@ -287,11 +286,8 @@ def _handle_args():
             elif key == "verbose":
                 if value: 
                     logger.setLevel(logging.INFO)
-                    logging.getLogger("stimgrab").setLevel(logging.INFO)
                 else: 
                     logger.setLevel(logging.ERROR)
-                    logging.getLogger("stimgrab").setLevel(logging.ERROR)
-                    print  (logging.getLogger("stimgrab"))
             
 # cache management
 
@@ -399,7 +395,7 @@ def _verify_files() -> None:
 
     if _create_stimuli:
         logger.info("[INFO]: Recreating stimuli data...\n")
-
+        import stimgrab
         if _STIMULI_PATH.exists(): shutil.rmtree(_STIMULI_PATH)
         stimgrab.create_stimuli(_nb_catimgs, _categories)
 

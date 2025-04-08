@@ -1,19 +1,49 @@
-from utils.image_processing import is_grayscale
-import torch
-import open_clip
-import cv2
+import logging
 import numpy as np
-from torchvision import transforms
 
+_default_logger_level = logging.INFO 
 
-# Load OpenCLIP model
-model, _, preprocess = open_clip.create_model_and_transforms("ViT-H/14", pretrained="laion2b_s32b_b79k")
-tokenizer = open_clip.get_tokenizer("ViT-H-14")
-#model, _, preprocess = open_clip.create_model_and_transforms("ViT-B/16", pretrained="openai")
-#tokenizer = open_clip.get_tokenizer('ViT-B-16')
+logger = logging.getLogger(__name__)
+logger.setLevel(_default_logger_level)
+logger.propagate = False
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model.to(device)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(_default_logger_level)
+
+formatter = logging.Formatter("%(message)s")
+console_handler.setFormatter(formatter)
+
+logger.addHandler(console_handler)
+
+_initialized = False
+
+_model = None
+_device = None
+
+_is_initialized = lambda : _initialized
+
+def init_clip():
+    logger.info("[INFO]: Loading OpenCLIP model...")
+
+    global torch; global transforms; global open_clip
+
+    import torch
+    import open_clip
+    from torchvision import transforms
+
+    global _model; global _device; global _initialized
+    # Load OpenCLIP _model
+    _model, _, _ = open_clip.create_model_and_transforms("ViT-H/14", pretrained="laion2b_s32b_b79k")
+
+    _device = "cuda" if torch.cuda.is_available() else "cpu"
+    _model.to(_device)
+
+    _initialized = True
+
+def _verify_clip():
+    if not _is_initialized():
+        raise AssertionError("OpenCLIP model is not itilialized, think about running init_clip() to initialize the necessary dependencies.")
+    
 
 def preprocess_image(image:np.array):
     """
@@ -25,7 +55,12 @@ def preprocess_image(image:np.array):
     if image is None:
         raise ValueError("Null reference to image.")
     
+    _verify_clip()
+
     # convert image to RGB
+    import cv2
+    from utils.image_processing import is_grayscale
+    
     if is_grayscale(image): image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB) 
     else: image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     
@@ -38,7 +73,7 @@ def preprocess_image(image:np.array):
         transforms.Normalize(mean=[0.481, 0.457, 0.408], std=[0.268, 0.261, 0.275])  # OpenCLIP normalization
     ])
 
-    image = transform(image).unsqueeze(0).to(device)
+    image = transform(image).unsqueeze(0).to(_device)
     return image
 
 def get_image_embedding(image):
@@ -48,10 +83,12 @@ def get_image_embedding(image):
     if image is None:
         raise ValueError("Null reference to image.")
     
+    _verify_clip()
+
     image_tensor = preprocess_image(image)
     
     with torch.no_grad():
-        embedding = model.encode_image(image_tensor)
+        embedding = _model.encode_image(image_tensor)
 
     return embedding / embedding.norm(dim=-1, keepdim=True)  # Normalize
 
@@ -62,9 +99,11 @@ def get_text_embedding(text):
     if text is None:
         raise ValueError("Null reference to text.")
     
-    tokens = open_clip.tokenize([text]).to(device)  # Correct way to tokenize
+    _verify_clip()
+
+    tokens = open_clip.tokenize([text]).to(_device)  # Correct way to tokenize
     with torch.no_grad():
-        embedding = model.encode_text(tokens)
+        embedding = _model.encode_text(tokens)
     
     return embedding / embedding.norm(dim=-1, keepdim=True)  # Normalize
 
@@ -75,6 +114,7 @@ def cosine_similarity(embedding1, embedding2):
     if embedding1 is None or embedding2 is None:
         raise ValueError("Null reference to embedding.")
     
+    import torch
     return torch.nn.functional.cosine_similarity(embedding1, embedding2).item()
 
 def compare_images(image1, image2):

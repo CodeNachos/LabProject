@@ -6,7 +6,7 @@ import pandas as pd
 import utils.image_processing as imp
 
 from pathlib import Path
-from utils.clip_similarity import compare_images, compare_image_text
+from utils.clip_similarity import compare_images, compare_image_text, init_clip
 
 print(f"modules imported in {time.time() - start} seconds")
 
@@ -26,6 +26,8 @@ def image_metric(clipsim:float, ssim:float, alpha=.7):
     return alpha * clipsim + (1-alpha) * ssim
 
 if __name__ == "__main__":
+    init_clip()
+
     metrics = []
 
     for img_path in GRAYSCALE_PATH.rglob("*.jpg"):
