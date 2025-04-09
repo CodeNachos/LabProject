@@ -14,7 +14,6 @@ from itertools import chain
 from strenum import StrEnum
 from collections import defaultdict
 from psychopy import visual, core, event
-
 # CONSTANTS ====================================================================
 
 class Modalities(IntEnum):
@@ -142,7 +141,7 @@ _DEFAULTS = {
     _CacheKeys.SUBJECTS     : 0,
     _CacheKeys.CATIMGS      : 5,
     _CacheKeys.CATEGORIES   : (_RELATIVE_PATH / "../res/expdata/categories.txt").resolve(),
-    _CacheKeys.REDFILTER    : [-.75, -.1, -.1],
+    _CacheKeys.REDFILTER    : [-.75, .1, -.1],
     _CacheKeys.CYANFILTER   : [-.1, -.7, -.7],
     _CacheKeys.USERANDSEED  : False,
     _CacheKeys.RANDSEED     : 42,
@@ -446,7 +445,7 @@ def _verify_files() -> None:
 def get_stimuli() -> Dict[str, Path]:
     stimuli_dict = defaultdict(list)
 
-    subject_modalities = [m for m in Modalities]
+    subject_modalities = [m for m in Modalities][:NB_MODALITIES]
     n = _subjectid % NB_MODALITIES
     subject_modalities = subject_modalities[-n:] + subject_modalities[:-n]
 
@@ -684,7 +683,7 @@ def run_stimulus(
         target.opacity = opacity
         target.draw()
         
-        mask = get_mondrian_pattern(win, 100, (1,1), color=_cyan_filter, max_opacity=max(0, 1-opacity-0.1))
+        mask = get_mondrian_pattern(win, 50, (1,1), color=_cyan_filter, max_opacity=max(0, 1-opacity))
         mask.draw()
         
         aperture.enabled = False
@@ -732,7 +731,7 @@ def run_trial(run_test:bool=True):
 
     stimuli = get_stimuli()
     np.random.shuffle(stimuli)
-
+    print(stimuli)
     trial_log = SubjectLog()
 
     show_instructions(win, _Instructions.INTRO)
