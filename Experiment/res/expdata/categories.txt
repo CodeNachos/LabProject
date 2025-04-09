@@ -3,3 +3,4 @@
 68-scenes/house-68
 68-scenes/library-68
 68-scenes/skyscraper-68
+68-scenes/temple-68
