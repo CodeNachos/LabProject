@@ -4,6 +4,7 @@ import json
 import shutil
 import logging
 import argparse
+import stimgrab
 import numpy as np
 from time import time
 from typing import Dict
@@ -22,6 +23,7 @@ class Modalities(IntEnum):
     MEDIUMLOW = 2
     MEDIUM = 3
     HIGH = 4
+    TEST = 5
 
     def __str__(self):
         names_str = {
@@ -49,45 +51,79 @@ class _CacheKeys(StrEnum):
     RANDSEED = 'random_seed'
     LANGUAGE = 'language'
 
-_TRIAL_INSTRUCTION = {
-    Languages.EN:
-        "Welcome!\n"
-        "In each trial, you will be presented with a cue followed by a short delay, "
-        "and then a flickering pattern will appear on the screen.\n"
-        "At some point, an image will slowly begin to emerge through the mask.\n\n"
-        "Your task:\n"
-        "As soon as you start to see an image, press the space bar as quickly and accurately as possible.\n\n"
-        "- Keep your eyes on the center of the screen throughout the trial.\n"
-        "- Press the space bar only when you are sure you have started to see the image breaking through the mask.\n"
-        "- There are no correct or incorrect images; we are only measuring when you become aware of it.\n\n"
-        "Take your time, stay focused, and do your best.\n\n"
-        "There are 3 different cue modalities in this experiment: control, textual, and visual.\n"
-        "- In the control modality, no predictive cue will be shown — only a screen indicating the modality.\n"
-        "- In the textual modality, a word or a sentence will be displayed that may help you anticipate the image.\n"
-        "- In the visual modality, a picture related to the upcoming image will be displayed.\n\n"
-        "Try to pay attention to the cues, as they may help you detect the image faster.\n\n"
-        "Thank you for participating!\n\n\n"
-        "Press the space bar to continue to the trials...",
+class _Instructions(StrEnum):
+    INTRO = "intro"
+    TEST = "test"
+    START = "start"
 
-    Languages.FR:
-        "Bienvenue !\n"
-        "À chaque essai, un indice vous sera présenté, suivi d'un court délai, "
-        "puis un motif clignotant apparaîtra à l'écran.\n"
-        "Une image commencera alors à émerger progressivement à travers ce masque.\n\n"
-        "Votre tâche :\n"
-        "Dès que vous commencez à voir une image, appuyez sur la barre d'espace le plus rapidement et précisément possible.\n\n"
-        "- Gardez vos yeux fixés au centre de l'écran pendant toute la durée de l'essai.\n"
-        "- Appuyez sur la barre d'espace uniquement si vous êtes sûr(e) de commencer à voir une image apparaître à travers le masque.\n"
-        "- Il n'y a pas de bonne ou de mauvaise image ; nous mesurons uniquement le moment où vous en prenez conscience.\n\n"
-        "Prenez votre temps, restez concentré(e) et faites de votre mieux.\n\n"
-        "Il y a 3 modalités d'indices différentes dans cette expérience : contrôle, textuelle et visuelle.\n"
-        "- Dans la modalité contrôle, aucun indice prédictif ne sera affiché — seulement un écran indiquant la modalité.\n"
-        "- Dans la modalité textuelle, un mot ou une phrase sera affiché et pourra vous aider à anticiper l'image.\n"
-        "- Dans la modalité visuelle, une image liée à l'image cible sera présentée comme indice.\n\n"
-        "Essayez de prêter attention aux indices, car ils peuvent vous aider à détecter l'image plus rapidement.\n\n"
-        "Merci pour votre participation !\n\n\n"
-        "Appuyez sur la barre d'espace pour continuer vers les essais..."
+_TRIAL_INSTRUCTION = {
+    "intro": {
+        Languages.EN:
+            "Welcome!\n"
+            "In each trial, you will be presented with a cue followed by a short delay, "
+            "and then a flickering pattern will appear on the screen.\n"
+            "At some point, an image will slowly begin to emerge through the mask.\n\n"
+            "Your task:\n"
+            "As soon as you start to see an image, press the space bar as quickly and accurately as possible.\n\n"
+            "- Keep your eyes on the center of the screen throughout the trial.\n"
+            "- Press the space bar only when you are sure you have started to see the image breaking through the mask.\n"
+            "- There are no correct or incorrect images; we are only measuring when you become aware of it.\n\n"
+            "Take your time, stay focused, and do your best.\n\n"
+            "There are 3 different cue modalities in this experiment: control, textual, and visual.\n"
+            "- In the control modality, no predictive cue will be shown — only a screen indicating the modality.\n"
+            "- In the textual modality, a word or a sentence will be displayed that may help you anticipate the image.\n"
+            "- In the visual modality, a picture related to the upcoming image will be displayed.\n\n"
+            "Try to pay attention to the cues, as they may help you detect the image faster.\n\n"
+            "Thank you for participating!\n\n\n"
+            "Press the space bar to continue to the trials...",
+
+        Languages.FR:
+            "Bienvenue !\n"
+            "À chaque essai, un indice vous sera présenté, suivi d'un court délai, "
+            "puis un motif clignotant apparaîtra à l'écran.\n"
+            "Une image commencera alors à émerger progressivement à travers ce masque.\n\n"
+            "Votre tâche :\n"
+            "Dès que vous commencez à voir une image, appuyez sur la barre d'espace le plus rapidement et précisément possible.\n\n"
+            "- Gardez vos yeux fixés au centre de l'écran pendant toute la durée de l'essai.\n"
+            "- Appuyez sur la barre d'espace uniquement si vous êtes sûr(e) de commencer à voir une image apparaître à travers le masque.\n"
+            "- Il n'y a pas de bonne ou de mauvaise image ; nous mesurons uniquement le moment où vous en prenez conscience.\n\n"
+            "Prenez votre temps, restez concentré(e) et faites de votre mieux.\n\n"
+            "Il y a 3 modalités d'indices différentes dans cette expérience : contrôle, textuelle et visuelle.\n"
+            "- Dans la modalité contrôle, aucun indice prédictif ne sera affiché — seulement un écran indiquant la modalité.\n"
+            "- Dans la modalité textuelle, un mot ou une phrase sera affiché et pourra vous aider à anticiper l'image.\n"
+            "- Dans la modalité visuelle, une image liée à l'image cible sera présentée comme indice.\n\n"
+            "Essayez de prêter attention aux indices, car ils peuvent vous aider à détecter l'image plus rapidement.\n\n"
+            "Merci pour votre participation !\n\n\n"
+            "Appuyez sur la barre d'espace pour continuer vers les essais..."
+    },
+
+    "test": {
+        Languages.EN:
+            "Before starting the experiment, you will complete a short test phase of 3 trials.\n"
+            "During this phase, the cue will always be identical to the target image.\n"
+            "Please follow the same instructions as before.\n\n\n"
+            "Press the space bar to begin the test trials...",
+
+        Languages.FR:
+            "Avant de commencer l'expérience, vous allez effectuer une courte phase de test composée de 3 essais.\n"
+            "Pendant cette phase, l'indice sera toujours identique à l'image cible.\n"
+            "Veuillez suivre les mêmes instructions que précédemment.\n\n\n"
+            "Appuyez sur la barre d'espace pour commencer les essais de test..."
+    },
+
+    "start": {
+        Languages.EN:
+            "If you felt comfortable during the test trials, you may now continue with the main experiment.\n"
+            "The experiment consists of 25 trials in total.\n\n\n"
+            "Press the space bar to begin...",
+
+        Languages.FR:
+            "Si vous vous êtes senti(e) à l'aise pendant les essais de test, vous pouvez maintenant passer à l'expérience principale.\n"
+            "L'expérience comporte un total de 25 essais.\n\n\n"
+            "Appuyez sur la barre d'espace pour commencer..."
+    }
 }
+
 
 _RELATIVE_PATH = Path(__file__).resolve().parent
 _STIMULI_PATH = (_RELATIVE_PATH / "../res/stimuli").resolve()
@@ -235,7 +271,8 @@ class SubjectLog:
         """append a new row to the CSV log file."""
         if response_time is None:
             response_time = -1
-        self.__writer.writerow([target_path, modality, response_time])
+        target = Path(*target_path.parts[-3:])
+        self.__writer.writerow([target, modality, response_time])
 
     def close(self):
         """close the file when done."""
@@ -286,8 +323,11 @@ def _handle_args():
             elif key == "verbose":
                 if value: 
                     logger.setLevel(logging.INFO)
+                    logging.getLogger("stimgrab").setLevel(logging.INFO)
                 else: 
                     logger.setLevel(logging.ERROR)
+                    logging.getLogger("stimgrab").setLevel(logging.ERROR)
+                    print  (logging.getLogger("stimgrab"))
             
 # cache management
 
@@ -395,7 +435,7 @@ def _verify_files() -> None:
 
     if _create_stimuli:
         logger.info("[INFO]: Recreating stimuli data...\n")
-        import stimgrab
+
         if _STIMULI_PATH.exists(): shutil.rmtree(_STIMULI_PATH)
         stimgrab.create_stimuli(_nb_catimgs, _categories)
 
@@ -452,6 +492,19 @@ def get_modality_path(target_path:Path, modality:Modalities) -> Path:
             return None
     else: 
         return None
+
+
+def get_test_stimuli():
+    test_stimuli_path = (_RELATIVE_PATH / "../res/stimuli/test").resolve()
+    test_stimuli_path.mkdir(parents=True, exist_ok=True)
+
+    test_stimuli = []
+
+    for img in test_stimuli_path.glob("*.jpg"):
+        test_stimuli.append(img)
+    
+    return test_stimuli
+
     
 
 # VISUAL =======================================================================
@@ -515,12 +568,12 @@ def get_mondrian_pattern(
 
 # FLOW =========================================================================
 
-def show_instructions(win:visual.Window):
+def show_instructions(win:visual.Window, content:_Instructions=_Instructions.INTRO):
     instruction_text = visual.TextStim(
         win,
         height=win.size[0]*.014,
         color="white",
-        text=_TRIAL_INSTRUCTION[_language],
+        text=_TRIAL_INSTRUCTION[content][_language],
         wrapWidth=win.size[0]*.7
     )
     
@@ -536,6 +589,7 @@ def show_instructions(win:visual.Window):
     win.flip()
 
     event.waitKeys(keyList=['space'])
+
 
 def run_delay(win:visual.Window, duration:float, 
               background:list=[], foreground:list=[]
@@ -558,7 +612,7 @@ def run_cue_presentation(win:visual.Window, cue_path:Path, modality:Modalities,
 
     cue = None
 
-    if modality in [Modalities.HIGH, Modalities.MEDIUM]:
+    if modality in [Modalities.HIGH, Modalities.MEDIUM, Modalities.TEST]:
         cue = visual.ImageStim(win, cue_path, size=win.size[0]*.4)
     elif modality in [Modalities.MEDIUMLOW, Modalities.LOW]:
         with open(cue_path, "r", encoding="utf-8") as cue_file:
@@ -580,7 +634,7 @@ def run_cue_presentation(win:visual.Window, cue_path:Path, modality:Modalities,
             text="CONTROL",
             wrapWidth=win.size[0]*.35
         )
-    
+
     if cue is not None:
         aperture.enabled = True
         cue.draw()
@@ -630,7 +684,7 @@ def run_stimulus(
         target.opacity = opacity
         target.draw()
         
-        mask = get_mondrian_pattern(win, 70, (.7,.7), color=_cyan_filter, max_opacity=1-opacity)
+        mask = get_mondrian_pattern(win, 100, (1,1), color=_cyan_filter, max_opacity=max(0, 1-opacity-0.1))
         mask.draw()
         
         aperture.enabled = False
@@ -655,7 +709,7 @@ def run_stimulus(
     return response_time
 
 
-def run_trial():
+def run_trial(run_test:bool=True):
     win = visual.Window(monitor="testMonitor",  units="pix", fullscr=not _windowed, allowStencil=True)
     
     if _use_seed:
@@ -681,7 +735,40 @@ def run_trial():
 
     trial_log = SubjectLog()
 
-    show_instructions(win)
+    show_instructions(win, _Instructions.INTRO)
+
+    if run_test:
+        test_stimuli = get_test_stimuli()
+        if test_stimuli:
+            show_instructions(win, _Instructions.TEST)
+
+            for stim in test_stimuli:
+                run_delay(
+                    win, fixation_duration, 
+                    background=[mondrian_background, stimulus_frame], 
+                    foreground=[fixation_cross]
+                )
+                # run cue presentation phase
+                run_cue_presentation(win, stim, Modalities.TEST, 
+                                    cue_duration, stimulus_aperture, 
+                                    background=[mondrian_background, stimulus_frame], 
+                                    foreground=[]
+                )
+                # run delay phase
+                run_delay(
+                    win, delay_duration, 
+                    background=[mondrian_background, stimulus_frame], 
+                    foreground=[fixation_cross]
+                )
+                # run stimulus presentation phase
+                reaction_time = run_stimulus(win, stim, stimulus_duration, 
+                                            flash_interval, stimulus_aperture, 
+                                            background=[mondrian_background, stimulus_frame], 
+                                            foreground=[fixation_cross]
+                )
+
+
+            show_instructions(win, _Instructions.START)
 
     # run a cycle for each stimulus
     for stim in stimuli:

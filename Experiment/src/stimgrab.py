@@ -1,4 +1,5 @@
 import os
+import torch
 import logging
 import zipfile
 import numpy as np
@@ -6,6 +7,7 @@ from enum import IntEnum
 from pathlib import Path
 from urllib.request import urlretrieve
 from urllib.error import URLError, HTTPError
+from transformers import AutoProcessor, Blip2ForConditionalGeneration, AutoTokenizer, AutoModelForSeq2SeqLM
 
 import utils.image_processing as imp
 
@@ -43,8 +45,6 @@ _MIDMOD_PATH = _STIMULI_PATH / "trialready/medium"
 _MIDLOWMOD_PATH = _STIMULI_PATH / "trialready/mediumlow"
 _LOWMOD_PATH = _STIMULI_PATH / "trialready/low"
 
-_MODELS_PATH = (_SRC_DIR / "../res/aimodels").resolve()
-
 # CONFIG =======================================================================
 _default_logger_level = logging.INFO 
 
@@ -63,8 +63,8 @@ logger.addHandler(console_handler)
 
 # UTILITY ======================================================================
 
-is_image_modality = lambda m : m in [Modalities.HIGH, Modalities.MEDIUM]
-is_text_modality  = lambda m : m in [Modalities.MEDIUMLOW, Modalities.LOW]
+_is_image_modality = lambda m : m in [Modalities.HIGH, Modalities.MEDIUM]
+_is_text_modality  = lambda m : m in [Modalities.MEDIUMLOW, Modalities.LOW]
 
 def _download_progress(blocknum, blocksize, totalsize):
     """
@@ -88,57 +88,6 @@ def _download_progress(blocknum, blocksize, totalsize):
         downloaded_mb = downloaded / (1024 * 1024)
         print(f"\rDownloading: {downloaded_mb:.2f}MB", end="")
 
-
-# Init ML models
-
-def _init_blip():
-    logger.info("[INFO]: Loading BLIP model...")
-
-    import torch
-    from transformers import AutoProcessor, Blip2ForConditionalGeneration
-    model_name = "Salesforce/blip2-flan-t5-xl"
-    
-    # load processor and model
-    if not hasattr(text_modality_transform, "PROCESSOR"):
-        text_modality_transform.PROCESSOR = AutoProcessor.from_pretrained(
-            model_name,
-            use_fast=True,
-            cache_dir=_MODELS_PATH
-        )
-    if not hasattr(text_modality_transform, "MODEL"):
-        text_modality_transform.MODEL = Blip2ForConditionalGeneration.from_pretrained(
-            model_name, 
-            device_map = {"": "cpu"},
-            torch_dtype = torch.float32,
-            low_cpu_mem_usage = True,
-            cache_dir=_MODELS_PATH
-        )
-
-def _init_opus():
-    logger.info("[INFO]: Loading OPUS model...")
-    import torch
-    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
-    
-    # load the model and tokenizer once
-    model_name = "Helsinki-NLP/opus-mt-en-fr"
-
-    if not hasattr(translate_text_modalities, "tokenizer"):
-        translate_text_modalities.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            cache_dir=_MODELS_PATH
-        )
-    if not hasattr(translate_text_modalities, "model"):
-        translate_text_modalities.model = AutoModelForSeq2SeqLM.from_pretrained(
-            model_name,
-            cache_dir=_MODELS_PATH
-        )
-    
-def _init_aimodels():
-    logger.info("[INFO]: Loading AI models...")
-    import torch
-    from transformers import AutoProcessor, Blip2ForConditionalGeneration, AutoTokenizer, AutoModelForSeq2SeqLM
-    _init_blip()
-    _init_opus()
 
 # DATSET =======================================================================
 
@@ -243,7 +192,7 @@ def medium_modality_transform(image:np.ndarray) -> np.ndarray:
     return imp.otsu_thresholding(hc_img)
 
 def image_modality_transform(image:np.ndarray, image_path:Path, modality:Modalities):
-    if not is_image_modality(modality):
+    if not _is_image_modality(modality):
         raise ValueError("Modality is not an image modality.")
 
     output_image = None
@@ -260,15 +209,21 @@ def image_modality_transform(image:np.ndarray, image_path:Path, modality:Modalit
 
 # Text modalities
 
-def translate_text_modalities():
+def _translate_text_modalities():
     # load the model and tokenizer once
-    if not hasattr(translate_text_modalities, "model"):
-        _init_opus
-    
-    import torch
-    
-    tokenizer = translate_text_modalities.tokenizer
-    model = translate_text_modalities.model
+    model_name = "Helsinki-NLP/opus-mt-en-fr"
+
+    if not hasattr(_translate_text_modalities, "tokenizer"):
+        _translate_text_modalities.tokenizer = AutoTokenizer.from_pretrained(
+            model_name
+        )
+    if not hasattr(_translate_text_modalities, "model"):
+        _translate_text_modalities.model = AutoModelForSeq2SeqLM.from_pretrained(
+            model_name
+        )
+
+    tokenizer = _translate_text_modalities.tokenizer
+    model = _translate_text_modalities.model
 
     # find all .txt files that are not already translated
     for txt_path in _STIMULI_PATH.rglob("*_en.txt"):
@@ -280,7 +235,6 @@ def translate_text_modalities():
         if not text:
             continue  # skip empty files
 
-        translation = "Missing stimulus description"
         # translate
         inputs = tokenizer(text, return_tensors="pt")
         translated_ids = model.generate(**inputs, max_length=100)
@@ -299,7 +253,7 @@ def translate_text_modalities():
         logger.debug(f">> Translated: {txt_path.name} -> {translated_path.name}")
 
 def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modalities):
-    if not is_text_modality(modality):
+    if not _is_text_modality(modality):
         raise ValueError("Modality is not a text modality.")
 
     MEDIUMLOW_PROMPT = ("Context: This is a scene description task."
@@ -310,40 +264,47 @@ def text_modality_transform(image:np.ndarray, image_path:Path, modality:Modaliti
         "Label the category of the main object or structure in this image? Answer:"
     )
 
-    # load processor and model
-    #if not hasattr(text_modality_transform, "MODEL"):
-    #    _init_blip
-    
-    #import torch
-    #device = torch.device("cpu")
+    model_name = "Salesforce/blip2-flan-t5-xl"
 
+    device = torch.device("cpu")
+    
+    # load processor and model
+    if not hasattr(text_modality_transform, "PROCESSOR"):
+        text_modality_transform.PROCESSOR = AutoProcessor.from_pretrained(
+            model_name,
+            use_fast=True
+        )
+    if not hasattr(text_modality_transform, "MODEL"):
+        text_modality_transform.MODEL = Blip2ForConditionalGeneration.from_pretrained(
+            model_name, 
+            device_map = {"": "cpu"},
+            torch_dtype = torch.float32,
+            low_cpu_mem_usage = True
+        )
+    
     # Prepare inputs
     relative_path = image_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]
-    
-    #import cv2
-    #blip_image = cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
+    import cv2
+    blip_image = cv2.cvtColor(image,cv2.COLOR_GRAY2RGB)
 
     if modality == Modalities.MEDIUMLOW:
-        #inputs = text_modality_transform.PROCESSOR(
-        #    images=blip_image, text=MEDIUMLOW_PROMPT, 
-        #    return_tensors="pt"
-        #).to(device, dtype=torch.float16)
+        inputs = text_modality_transform.PROCESSOR(
+            images=blip_image, text=MEDIUMLOW_PROMPT, 
+            return_tensors="pt"
+        ).to(device, dtype=torch.float16)
         dest = Path(f"{_MIDLOWMOD_PATH}{relative_path}")
         dest = dest.with_name(dest.stem + "_en.txt")
-    
     elif modality == Modalities.LOW:
-        #inputs = text_modality_transform.PROCESSOR(
-        #    images=blip_image, text=LOW_PROMPT, 
-        #    return_tensors="pt"
-        #).to(device, dtype=torch.float16)
+        inputs = text_modality_transform.PROCESSOR(
+            images=blip_image, text=LOW_PROMPT, 
+            return_tensors="pt"
+        ).to(device, dtype=torch.float16)
         dest = Path(f"{_LOWMOD_PATH}{relative_path}")
         dest = dest.with_name(dest.stem + "_en.txt")
 
-    description = "Missing stimulus description"
-
     # generate output
-    #generated_ids = text_modality_transform.MODEL.generate(**inputs, max_new_tokens=30)
-    #description = text_modality_transform.PROCESSOR.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+    generated_ids = text_modality_transform.MODEL.generate(**inputs, max_new_tokens=30)
+    description = text_modality_transform.PROCESSOR.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
     logger.debug(">>",description)
 
     # save the description
@@ -361,10 +322,6 @@ def process_stimuli():
     This function will convert each image to grayscale, apply modalities 
     transform methods, saving each processed image to the appropriate directory.
     """
-    #_init_aimodels()
-
-    logger.info("")
-    
     for img_path in _ORIGIN_PATH.rglob("*.jpg"):
         logger.info(f"Treating \"{img_path.as_posix()[len(_ORIGIN_PATH.as_posix()):]}\"")
         img = imp.read_image(img_path, flag=imp.IOFlags.GRAYSCALE, dim=IMDIM)
@@ -377,11 +334,11 @@ def process_stimuli():
 
         for m in list(Modalities):
             logger.debug(f"-   Converting using {m} congruence transform...")
-            if is_text_modality(m): 
+            if _is_text_modality(m): 
                 text_modality_transform(img, img_path, m)
-            elif is_image_modality(m): image_modality_transform(img, img_path, m)
+            elif _is_image_modality(m): image_modality_transform(img, img_path, m)
 
-        translate_text_modalities()
+        _translate_text_modalities()
 
     logger.info("\nImage treatment complete!")
 
@@ -396,4 +353,8 @@ def create_stimuli(nb_images:int=0, category_list:str=None):
     process_stimuli()
 
 if __name__ == "__main__":
-    pass
+    verify_dataset()
+    logger.info("")
+    extract_images(5, "test.txt")
+    logger.info("")
+    process_stimuli()
