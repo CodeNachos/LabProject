@@ -54,6 +54,7 @@ class _Instructions(StrEnum):
     INTRO = "intro"
     TEST = "test"
     START = "start"
+    END = "end"
 
 _TRIAL_INSTRUCTION = {
     "intro": {

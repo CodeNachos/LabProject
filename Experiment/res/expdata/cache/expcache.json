@@ -1,0 +1,18 @@
+{
+  "total_subjects": 15,
+  "images_per_category": 5,
+  "category_list": "C:\\Users\\rafae\\OneDrive\\Documents\\univ\\M1\\Semestre8\\LabProject\\Experiment\\res\\expdata\\categories.txt",
+  "red_filter": [
+    -0.75,
+    0.1,
+    -0.1
+  ],
+  "cyan_filter": [
+    -0.1,
+    -0.7,
+    -0.7
+  ],
+  "use_random_seed": false,
+  "random_seed": 42,
+  "language": "fr"
+}
